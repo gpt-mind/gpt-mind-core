@@ -1,166 +1,136 @@
-# GPT Mind Prompts
+# GPT Mind Core
 
-This repository contains a collection of prompts for the [GPT-3](https://openai.com/blog/openai-api/) API.
+The Mind library is a JavaScript library for building conversational agents that can generate responses based on a set of pre-defined rules. It allows you to define a state map, bindings between agents, and a set of agents that can generate responses based on input statements.
 
-## Installing
+## Installation
+
+You can install the Mind library using npm:
 
 ```bash
-npm install @gpt-mind/prompts
+npm install @gpt-mind/core
 ```
 
 ## Usage
 
+To use the Mind library, you need to create an instance of the Mind class and pass it a configuration object. The configuration object should have the following properties:
+
+- stateMap: An object representing the current state of the conversation.
+- bindings: An object mapping agents to other agents that they are bound to.
+- agents: An object containing the definitions of the agents.
+- start: An object representing the initial state of the conversation.
+- sources: An object mapping agents to functions that generate responses based on the current state of the conversation.
+
+Here is an example of how to use the Mind library:
+
 ```js
-const prompts = require('@gpt-mind/prompts');
+import { Mind } from 'mind-library';
+imoport OpenAI from 'openai-api';
 
+const openAI = new OpenAI('sk-...');
 
-const definition = prompts.getPromptDefinition(`given the following three statements:
-"{{statement1}}"
-"{{statement2}}", and 
-"{{statement3}}", which top two statements are most likely to be true?`);
+function complete(query, options) {
+  return openAI.complete({
+    engine: 'davinci',
+    prompt: query,
+    maxTokens: 100,
+    temperature: 0.9,
+    topP: 1,
+    presencePenalty: 0,
+    frequencyPenalty: 0,
+    bestOf: 1,
+    n: 1,
+    stream: false,
+    stop: ['\n', '###'],
+    ...options
+  });
+}
 
-const statements = {
-  statement1: 'The sky is blue.',
-  statement2: 'The sky is green.',
-  statement3: 'The sky is red.',
+const config = {
+  stateMap: {},
+  bindings: {
+    "input": ["agent1"],
+    "agent1": ['agent2'],
+    "agent2": ['agent3'],
+    "agent3": ['output', 'agent4'],
+    "agent4": ["internal"],
+    "internal": ['canVisualize', 'think'],
+    "canVisualize": ["visualize"],
+    "visualize": ["internal"],
+    "output": []
+  },
+  agents: {
+    "agent1": "generate a description of the statement \"{{input}}\"",
+    "agent2": "generate a response to the statement \"{{agent1}}\"",
+    "agent3": "generate a response given statements \"{{agent1}}\"\nand statements \"{{agent2}}\"",
+    "agent4": "generate a response free of social mind to the statement \"{{agent1,agent2}}\"",
+    "canVisualize": "is there visualizable imagery in the statement \"{{agent1,agent2}}\"",
+    "visualize": "generate a detailed description of the imagery in the statement \"{{agent1,agent2}}\"",
+  },
+  start: {},
+  sources: {
+    "agent1": (agent, query, options) => complete(query, options),
+    "agent2": (agent, query, options) => complete(query, options),
+    "agent3": (agent, query, options) => complete(query, options),
+    "agent4": (agent, query, options) => complete(query, options),
+    "canVisualize": (agent, query, options) => complete(query, options),
+    "visualize": (agent, query, options) => Automatic111.txt2img(query, "", { steps: 20 }),
+    "think": (agent, query, options) => complete(query, options),
+  }
 };
 
-if (definition.validate(statements)) { // check that all required params are present
-  const response = await definition.complete(params, apiKey, {}, ['mostlikely', 'nextmostlikely']);
-  console.log(response); // { "mostlikely": "The sky is blue.", "nextmostlikely": "The sky is green." }
-}
+const mind = new Mind(config);
+
+mind.on('output', (event, output) => {
+  console.log(output);
+});
+
+mind.input('agent1', 'Hello');
 ```
 
-## Function Signature
+In this example, we create an instance of the Mind class with a configuration object that defines a set of agents that can generate responses based on input statements. We then register an event listener for the output event, which is triggered when an agent generates a response. Finally, we call the input method of the mind instance to start the conversation with the agent1 agent.
 
-```ts
-function getPromptDefinition(prompt: string): PromptDefinition
-```
+## API
 
-## Description
+Mind(config: Object)
 
-This function gets the prompt definition object based on a given prompt string. It extracts replacement tokens from the prompt string, and creates an object with properties for prompt, params, validate, replace, and complete.
+The Mind class constructor takes a configuration object as an argument. The configuration object should have the following properties:
 
-The validate property checks if all required parameters are present in the params object. The replace property replaces all replacement tokens in the prompt string with their corresponding values from the params object. The complete property uses an OpenAI API to complete the given prompt with a valid response.
+`stateMap`: An object representing the current state of the conversation.
+`bindings`: An object mapping agents to other agents that they are bound to.
+`agents`: An object containing the definitions of the agents.
+`start`: An object representing the initial state of the conversation.
+`sources`: An object mapping agents to functions that generate responses based on the current state of the conversation.
 
-## Parameters
+`on(event: string, callback: (event: string, output: string) => void)`
 
-**prompt** - A string representing the prompt to generate the prompt definition object for.
-Return Value
-Returns an object of type PromptDefinition which contains the following properties:
+Registers an event listener for the specified event. The callback function is called when the event is triggered, and is passed two arguments: the name of the event, and the output generated by the agent that triggered the event.
 
-### prompt
-A string representing the original prompt.
-- params - An array of strings representing the replacement tokens in the prompt string.
+`once(event: string, callback: (event: string, output: string) => void)`
 
-### validate
-A function that validates the params object to make sure all required params are present. It takes one parameter:
-- params - An object containing the parameter values.
-Returns a boolean value indicating whether the params object is valid or not.
+Registers an event listener for the specified event that will only be called once. The callback function is called when the event is triggered, and is passed two arguments: the name of the event, and the output generated by the agent that triggered the event.
 
-### replace
-A function that replaces all replacement tokens in the prompt string with their corresponding values from the params object. It takes one parameter:
-- params - An object containing the parameter values.
-Returns a string representing the prompt with replacement tokens replaced by their values.
+`off(event: string, callback: (event: string, output: string) => void)`
 
-### complete
-A function that uses the OpenAI API to complete the given prompt with a valid response. It takes three parameters:
-- params - An object containing the parameter values.
-- apiKey - A string representing the API key to use for the OpenAI API.
-- settings - An optional object containing additional settings to use for the OpenAI API.
-- responseFields - An optional array of strings representing the fields to return from the OpenAI API response. Defaults to ['results'].
-Returns a Promise that resolves to a string representing the completed prompt.
+Removes the specified event listener.
 
-## Example Usage
+`emit(event: string, output: any)`
 
-```typescript
-const apiKey = 'my-api-key';
+Triggers the specified event with the given output.
 
-const prompt = 'My name is {{name}} and I like {{food}}.';
-const params = { name: 'John', food: 'pizza' };
-const promptDefinition = getPromptDefinition(prompt);
+`input(agent: string, query: string)`
 
-if (promptDefinition.validate(params)) {
-  const completedPrompt = await promptDefinition.complete(params, apiKey);
-  console.log(promptDefinition.replace(params) + completedPrompt);
-}
-```
+Sets the input for the specified agent and triggers the conversation.
 
-## Prompts
+`run(agent: string)`
 
-- meaningOfStatement - What does this statement mean?
-- provideEvidence - Provide evidence for this statement.
-- truthfulness - Is this statement true?
-- provideImplications - Provide implications for this statement.
-- provideContext - Provide context for this statement.
-- provideCounterExamples - Provide counter examples for this statement.
-- provideEvidenceComparison - Provide evidence for this statement compared to this other statement.
-- logicalContradiction - Is this statement a logical contradiction?
-- provideImplicationsComparison - Provide implications for this statement compared to this other statement.
-- orderStatementsByGenerality - Order these statements by generality.
-- provideStatementRelationship - Provide a relationship between these two statements.
-- logicalContradictionMultiple - Is this statement a logical contradiction with these other statements?
-- provideEvidenceRelationship - Provide evidence for this statement compared to this other statement.
-- isStatementVisualizable - Is this statement visualizable?
-- describeImageFromStatement - Describe an image from the statement
-- identifyChallengesVisualizingStatement - Identify challenges visualizing this statement.
-- feelingAgent - provide a conversational response given an emotional state and current conversation
-- leftBrainAgent - provide a conversational response given a left brain state and current conversation
-- rightBrainAgent - provide a conversational response given a right brain state and current conversation
-- expandedContext - provide a conversational response given a context and current conversation
-- concensus - provide a conversational response given a concensus and current conversation
-- testComprehension - provide a conversational response given a test and current conversation
-- testComprehensionScale - provide a conversational response given a test and current conversation
-- conversationThoughts - provide a conversational response given a thought and current conversation
-- thoughtFeelings - provide a conversational response given a thought and current conversation
+Runs the specified agent and its bound agents.
+
+`complete(agent: any, query: string, options: any)`
+
+Generates a response for the specified agent with the given query and options.
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for more information.
+Contributions are welcome! 
 
-
-
-
-
-------
-summary with usage:
-
-
-# GPT Mind Prompts
-
-A library for generating prompts for the [GPT-3](https://openai.com/blog/openai-api/) API. contains a number of pre-generated prompts as well as a function for generating your own. The function allows you to create prompts with replacement tokens that can be replaced with values from a params object, giving an easy programmatic interface for calling propmpts.
-
-## Installing
-
-```bash
-npm install @gpt-mind/prompts
-```
-
-## Usage
-
-### Example 1
-```js
-const prompts = require('@gpt-mind/prompts');
-const definition = prompts.getPromptDefinition(prompts.meaningOfStatement);
-
-const params = {
-  statement: 'The sky is blue.',
-};
-
-if (definition.validate(params)) {
-  const completedPrompt = await definition.complete(params, apiKey);
-  console.log(definition.replace(params) + completedPrompt);
-}
-```
-
-### Example 2
-```js
-const prompts = require('@gpt-mind/prompts');
-const definition = prompts.getPromptDefinition(`My name is {{name}} and I like {{food}}.`);
-const params = { name: 'John', food: 'pizza' };
-
-if (definition.validate(params)) {
-  const completedPrompt = await definition.complete(params, apiKey);
-  console.log(definition.replace(params) + completedPrompt);
-}
-```
+Please read the [contributing guidelines](
